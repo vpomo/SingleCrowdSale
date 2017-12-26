@@ -4,11 +4,18 @@ contract('SingleCrowdSale', (accounts) => {
     var contract;
     var account_one = accounts[0];
     var account_two = accounts[1];
+    //http://www.onlineconversion.com/unix_time.htm
+    var startTime = 1545825600;
+    var endTime = 1551182400;
+    var rate = 20;
+    var goal = 300;
+    var cap = 290;
+    var wallet = 0xaa347ae50194bd91a4641658f56611edead0d993;
 
 
     it('should deployed contract', async ()  => {
         assert.equal(undefined, contract);
-        contract = await SingleCrowdSale.deployed(12345);
+        contract = await SingleCrowdSale.deployed();
         assert.notEqual(undefined, contract);
     });
 
@@ -17,15 +24,21 @@ contract('SingleCrowdSale', (accounts) => {
         assert.notEqual(undefined, contract.address);
     });
 
+    it('get current time', async ()  => {
+        var curTime = await contract.currentTime.call();
+        console.log("current time = " + curTime);
+    assert.notEqual(undefined, contract.address);
+    });
 
-    /*
-        contract('SingleCrowdSale', function (accounts) {
-            it("should assert true", function (done) {
-                var contract = SingleCrowdSale.deployed(12345);
-                assert.isTrue(true);
-                done();
-            });
-    */
+
+/*
+    contract('SingleCrowdSale', function (accounts) {
+        it("should assert true", function (done) {
+            var contract = SingleCrowdSale.deployed(12345);
+            assert.isTrue(true);
+            done();
+        });
+*/
 
     /*
         it("should symbol=PVA for contract PvaToken", function () {

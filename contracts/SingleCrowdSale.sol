@@ -305,24 +305,25 @@ contract Crowdsale {
 
 
     function Crowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, address _wallet) public {
+
         require(_startTime >= now);
         require(_endTime >= _startTime);
         require(_rate > 0);
         require(_wallet != address(0));
 
-        token = createTokenContract();
+        //token = createTokenContract();
         startTime = _startTime;
         endTime = _endTime;
         rate = _rate;
         wallet = _wallet;
     }
 
+
     // creates the token to be sold.
     // override this method to have crowdsale of a specific mintable token.
     function createTokenContract() internal returns (MintableToken) {
         return new MintableToken();
     }
-
 
     // fallback function can be used to buy tokens
     function() payable public {
@@ -369,21 +370,26 @@ contract Crowdsale {
 }
 
 
-contract SingleCrowdSale is Ownable, StandardToken {
+contract SingleCrowdSale is Ownable, StandardToken, Crowdsale {
 
     string public constant name = "PvaToken";
     string public constant symbol = "PVA";
     uint8 public constant decimals = 18;
-    uint256 public constant INITIAL_SUPPLY = 20000 * (10 ** uint256(decimals));
 
-    function SingleCrowdSale(uint256 _startTime) public {
-        totalSupply = INITIAL_SUPPLY;
-        balances[msg.sender] = INITIAL_SUPPLY;
-        _startTime = 10;
+
+    function SingleCrowdSale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _goal, uint256 _cap, address _wallet) public
+    Crowdsale(_startTime, _endTime, _rate, _wallet)
+    {
+        _cap = 10;
+        _goal = 10;
         owner = msg.sender;
         transfersEnabled = true;
     }
 
+    function currentTime() public view returns (uint256){
+        //return now;
+        return startTime;
+    }
 
 }
 
