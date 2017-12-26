@@ -4,14 +4,6 @@ contract('SingleCrowdSale', (accounts) => {
     var contract;
     var account_one = accounts[0];
     var account_two = accounts[1];
-    //http://www.onlineconversion.com/unix_time.htm
-    var startTime = 1545825600;
-    var endTime = 1551182400;
-    var rate = 20;
-    var goal = 300;
-    var cap = 290;
-    var wallet = 0xaa347ae50194bd91a4641658f56611edead0d993;
-
 
     it('should deployed contract', async ()  => {
         assert.equal(undefined, contract);
@@ -27,6 +19,8 @@ contract('SingleCrowdSale', (accounts) => {
     it('get current time', async ()  => {
         var curTime = await contract.currentTime.call();
         console.log("current time = " + curTime);
+        var symbol = await contract.symbol.call();
+        console.log("symbol = " + symbol);
     assert.notEqual(undefined, contract.address);
     });
 

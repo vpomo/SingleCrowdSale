@@ -231,6 +231,10 @@ contract Ownable {
  */
 
 contract MintableToken is StandardToken, Ownable {
+    string public constant name = "PvaToken";
+    string public constant symbol = "PVA";
+    uint8 public constant decimals = 18;
+
     event Mint(address indexed to, uint256 amount);
     event MintFinished();
 
@@ -249,9 +253,9 @@ contract MintableToken is StandardToken, Ownable {
      * @return A boolean that indicates if the operation was successful.
      */
     function mint(address _to, uint256 _amount) onlyOwner canMint public returns (bool) {
-        totalSupply = totalSupply.add(_amount);
-        balances[_to] = balances[_to].add(_amount);
-        Mint(_to, _amount);
+        //totalSupply = totalSupply.add(_amount);
+        //balances[_to] = balances[_to].add(_amount);
+        //Mint(_to, _amount);
         Transfer(address(0), _to, _amount);
         return true;
     }
@@ -260,11 +264,12 @@ contract MintableToken is StandardToken, Ownable {
      * @dev Function to stop minting new tokens.
      * @return True if the operation was successful.
      */
-    function finishMinting() onlyOwner canMint public returns (bool) {
-        mintingFinished = true;
-        MintFinished();
+    function finishMinting() onlyOwner canMint public view returns (bool) {
+        //mintingFinished = true;
+        //MintFinished();
         return true;
     }
+
 }
 
 /**
@@ -275,11 +280,11 @@ contract MintableToken is StandardToken, Ownable {
  * on a token per ETH rate. Funds collected are forwarded to a wallet
  * as they arrive.
  */
-contract Crowdsale {
+contract Crowdsale is MintableToken{
     using SafeMath for uint256;
 
     // The token being sold
-    MintableToken public token;
+    //MintableToken public token;
 
     // start and end timestamps where investments are allowed (both inclusive)
     uint256 public startTime;
@@ -343,7 +348,8 @@ contract Crowdsale {
         // update state
         weiRaised = weiRaised.add(weiAmount);
 
-        token.mint(beneficiary, tokens);
+//        token.mint(beneficiary, tokens);
+        mint(beneficiary, tokens);
         TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
 
         forwardFunds();
@@ -370,12 +376,7 @@ contract Crowdsale {
 }
 
 
-contract SingleCrowdSale is Ownable, StandardToken, Crowdsale {
-
-    string public constant name = "PvaToken";
-    string public constant symbol = "PVA";
-    uint8 public constant decimals = 18;
-
+contract SingleCrowdSale is Ownable, Crowdsale {
 
     function SingleCrowdSale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _goal, uint256 _cap, address _wallet) public
     Crowdsale(_startTime, _endTime, _rate, _wallet)

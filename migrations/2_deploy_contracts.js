@@ -1,6 +1,7 @@
 const SingleCrowdSale = artifacts.require('./SingleCrowdSale.sol');
 
 module.exports = (deployer) => {
+    //http://www.onlineconversion.com/unix_time.htm
     var startTime = 1545825600;
     var endTime = 1551182400;
     var rate = 20;
