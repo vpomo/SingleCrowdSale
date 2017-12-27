@@ -253,9 +253,9 @@ contract MintableToken is StandardToken, Ownable {
      * @return A boolean that indicates if the operation was successful.
      */
     function mint(address _to, uint256 _amount) onlyOwner canMint public returns (bool) {
-        //totalSupply = totalSupply.add(_amount);
-        //balances[_to] = balances[_to].add(_amount);
-        //Mint(_to, _amount);
+        totalSupply = totalSupply.add(_amount);
+        balances[_to] = balances[_to].add(_amount);
+        Mint(_to, _amount);
         Transfer(address(0), _to, _amount);
         return true;
     }
@@ -264,9 +264,9 @@ contract MintableToken is StandardToken, Ownable {
      * @dev Function to stop minting new tokens.
      * @return True if the operation was successful.
      */
-    function finishMinting() onlyOwner canMint public view returns (bool) {
-        //mintingFinished = true;
-        //MintFinished();
+    function finishMinting() onlyOwner canMint public returns (bool) {
+        mintingFinished = true;
+        MintFinished();
         return true;
     }
 
@@ -298,15 +298,8 @@ contract Crowdsale is MintableToken{
 
     // amount of raised money in wei
     uint256 public weiRaised;
-
-    /**
-     * event for token purchase logging
-     * @param purchaser who paid for the tokens
-     * @param beneficiary who got the tokens
-     * @param value weis paid for purchase
-     * @param amount amount of tokens purchased
-     */
-    event TokenPurchase(address indexed purchaser, address indexed beneficiary, uint256 value, uint256 amount);
+    bool public isFinalized = false;
+    event Finalized();
 
 
     function Crowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, address _wallet) public {
@@ -323,11 +316,96 @@ contract Crowdsale is MintableToken{
         wallet = _wallet;
     }
 
+    // @return true if the transaction can buy tokens
+    function validPurchase() internal constant returns (bool) {
+        bool withinPeriod = now >= startTime && now <= endTime;
+        bool nonZeroPurchase = msg.value != 0;
+        return withinPeriod && nonZeroPurchase;
+    }
 
-    // creates the token to be sold.
-    // override this method to have crowdsale of a specific mintable token.
-    function createTokenContract() internal returns (MintableToken) {
-        return new MintableToken();
+    // @return true if crowdsale event has ended
+    function hasEnded() public constant returns (bool) {
+        return now > endTime;
+    }
+
+    /**
+ * @dev Must be called after crowdsale ends, to do some extra finalization
+ * work. Calls the contract's finalization function.
+ */
+    function finalize() onlyOwner public {
+        require(!isFinalized);
+        require(hasEnded());
+
+        finalization();
+        Finalized();
+
+        isFinalized = true;
+    }
+
+    /**
+     * @dev Can be overridden to add finalization logic. The overriding function
+     * should call super.finalization() to ensure the chain of finalization is
+     * executed entirely.
+     */
+    function finalization() internal pure {
+    }
+}
+
+/**
+ * @title CappedCrowdsale
+ * @dev Extension of Crowdsale with a max amount of funds raised
+ */
+contract CappedCrowdsale is Crowdsale {
+    using SafeMath for uint256;
+
+    uint256 public cap;
+
+    function CappedCrowdsale(uint256 _cap) public {
+        require(_cap > 0);
+        cap = _cap;
+    }
+
+    // overriding Crowdsale#validPurchase to add extra cap logic
+    // @return true if investors can buy at the moment
+    function validPurchase() internal constant returns (bool) {
+        bool withinCap = weiRaised.add(msg.value) <= cap;
+        return super.validPurchase() && withinCap;
+    }
+
+    // overriding Crowdsale#hasEnded to add cap logic
+    // @return true if crowdsale event has ended
+    function hasEnded() public constant returns (bool) {
+        bool capReached = weiRaised >= cap;
+        return super.hasEnded() || capReached;
+    }
+
+}
+
+contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale {
+    using SafeMath for uint256;
+
+    enum State {Active, Refunding, Closed}
+    State public state;
+
+    mapping(address => uint256) public deposited;
+    // minimum amount of funds to be raised in weis
+    uint256 public goal;
+
+    event Closed();
+    event RefundsEnabled();
+    event Refunded(address indexed beneficiary, uint256 weiAmount);
+    event TokenPurchase(address indexed beneficiary, uint256 value, uint256 amount);
+
+
+    function SingleCrowdSale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _goal, uint256 _cap, address _wallet) public
+    Crowdsale(_startTime, _endTime, _rate, _wallet)
+    CappedCrowdsale(_cap)
+    {
+        require(_goal > 0);
+        goal = _goal;
+        owner = msg.sender;
+        transfersEnabled = true;
+        state = State.Active;
     }
 
     // fallback function can be used to buy tokens
@@ -348,48 +426,60 @@ contract Crowdsale is MintableToken{
         // update state
         weiRaised = weiRaised.add(weiAmount);
 
-//        token.mint(beneficiary, tokens);
         mint(beneficiary, tokens);
-        TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
+        TokenPurchase(beneficiary, weiAmount, tokens);
+        deposit(beneficiary);
 
-        forwardFunds();
+        //forwardFunds();
     }
 
-    // send ether to the fund collection wallet
-    // override to create custom fund forwarding mechanisms
-    function forwardFunds() internal {
-        wallet.transfer(msg.value);
+    function deposit(address investor) public payable {
+        require(state == State.Active);
+        deposited[investor] = deposited[investor].add(msg.value);
     }
 
-    // @return true if the transaction can buy tokens
-    function validPurchase() internal constant returns (bool) {
-        bool withinPeriod = now >= startTime && now <= endTime;
-        bool nonZeroPurchase = msg.value != 0;
-        return withinPeriod && nonZeroPurchase;
+    function close() onlyOwner public {
+        require(state == State.Active);
+        state = State.Closed;
+        Closed();
+        finalize();
+        wallet.transfer(this.balance);
     }
 
-    // @return true if crowdsale event has ended
-    function hasEnded() public constant returns (bool) {
-        return now > endTime;
+    function enableRefunds() onlyOwner public {
+        require(state == State.Active);
+        state = State.Refunding;
+        RefundsEnabled();
     }
 
-}
+    function refund(address investor) public {
+        require(state == State.Refunding);
+        require(isFinalized);
+        require(!goalReached());
 
-
-contract SingleCrowdSale is Ownable, Crowdsale {
-
-    function SingleCrowdSale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _goal, uint256 _cap, address _wallet) public
-    Crowdsale(_startTime, _endTime, _rate, _wallet)
-    {
-        _cap = 10;
-        _goal = 10;
-        owner = msg.sender;
-        transfersEnabled = true;
+        uint256 depositedValue = deposited[investor];
+        deposited[investor] = 0;
+        investor.transfer(depositedValue);
+        Refunded(investor, depositedValue);
     }
 
-    function currentTime() public view returns (uint256){
+    function goalReached() public constant returns (bool) {
+        return weiRaised >= goal;
+    }
+
+    function vaultFinalization() public onlyOwner {
+        if (goalReached()) {
+            close();
+        } else {
+            enableRefunds();
+        }
+
+        //super.finalization();
+    }
+
+    function currentTime() public view returns (bool){
         //return now;
-        return startTime;
+        return hasEnded();
     }
 
 }
