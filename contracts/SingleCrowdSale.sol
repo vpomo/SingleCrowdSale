@@ -238,7 +238,7 @@ contract MintableToken is StandardToken, Ownable {
     event Mint(address indexed to, uint256 amount);
     event MintFinished();
 
-    bool public mintingFinished = false;
+    bool public mintingFinished;
 
 
     modifier canMint() {
@@ -252,7 +252,8 @@ contract MintableToken is StandardToken, Ownable {
      * @param _amount The amount of tokens to mint.
      * @return A boolean that indicates if the operation was successful.
      */
-    function mint(address _to, uint256 _amount) onlyOwner canMint public returns (bool) {
+    function mint(address _to, uint256 _amount) canMint internal returns (bool) {
+
         totalSupply = totalSupply.add(_amount);
         balances[_to] = balances[_to].add(_amount);
         Mint(_to, _amount);
@@ -264,7 +265,7 @@ contract MintableToken is StandardToken, Ownable {
      * @dev Function to stop minting new tokens.
      * @return True if the operation was successful.
      */
-    function finishMinting() onlyOwner canMint public returns (bool) {
+    function finishMinting() onlyOwner canMint internal returns (bool) {
         mintingFinished = true;
         MintFinished();
         return true;
@@ -280,11 +281,8 @@ contract MintableToken is StandardToken, Ownable {
  * on a token per ETH rate. Funds collected are forwarded to a wallet
  * as they arrive.
  */
-contract Crowdsale is MintableToken{
+contract Crowdsale is Ownable {
     using SafeMath for uint256;
-
-    // The token being sold
-    //MintableToken public token;
 
     // start and end timestamps where investments are allowed (both inclusive)
     uint256 public startTime;
@@ -314,13 +312,6 @@ contract Crowdsale is MintableToken{
         endTime = _endTime;
         rate = _rate;
         wallet = _wallet;
-    }
-
-    // @return true if the transaction can buy tokens
-    function validPurchase() internal constant returns (bool) {
-        bool withinPeriod = now >= startTime && now <= endTime;
-        bool nonZeroPurchase = msg.value != 0;
-        return withinPeriod && nonZeroPurchase;
     }
 
     // @return true if crowdsale event has ended
@@ -368,8 +359,16 @@ contract CappedCrowdsale is Crowdsale {
     // overriding Crowdsale#validPurchase to add extra cap logic
     // @return true if investors can buy at the moment
     function validPurchase() internal constant returns (bool) {
-        bool withinCap = weiRaised.add(msg.value) <= cap;
-        return super.validPurchase() && withinCap;
+        uint256 curWeiRaised = weiRaised;
+        curWeiRaised.add(msg.value);
+
+        if(now >= startTime && now >= endTime){
+            return false;
+        }
+        if(msg.value == 0){
+            return false;
+        }
+        return curWeiRaised <= cap;
     }
 
     // overriding Crowdsale#hasEnded to add cap logic
@@ -381,7 +380,7 @@ contract CappedCrowdsale is Crowdsale {
 
 }
 
-contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale {
+contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale, MintableToken {
     using SafeMath for uint256;
 
     enum State {Active, Refunding, Closed}
@@ -390,6 +389,7 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale {
     mapping(address => uint256) public deposited;
     // minimum amount of funds to be raised in weis
     uint256 public goal;
+    //MintableToken public token;
 
     event Closed();
     event RefundsEnabled();
@@ -405,6 +405,7 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale {
         goal = _goal;
         owner = msg.sender;
         transfersEnabled = true;
+        mintingFinished = false;
         state = State.Active;
     }
 
@@ -414,21 +415,23 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale {
     }
 
     // low level token purchase function
-    function buyTokens(address beneficiary) public payable {
-        require(beneficiary != address(0));
+    function buyTokens(address investor) public payable {
+        require(investor != address(0));
         require(validPurchase());
+
 
         uint256 weiAmount = msg.value;
 
         // calculate token amount to be created
         uint256 tokens = weiAmount.mul(rate);
-
         // update state
         weiRaised = weiRaised.add(weiAmount);
 
-        mint(beneficiary, tokens);
-        TokenPurchase(beneficiary, weiAmount, tokens);
-        deposit(beneficiary);
+
+        mint(investor, tokens);
+        TokenPurchase(investor, weiAmount, tokens);
+        deposit(investor);
+
 
         //forwardFunds();
     }
@@ -440,7 +443,10 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale {
 
     function close() onlyOwner public {
         require(state == State.Active);
+        require(hasEnded());
         state = State.Closed;
+        transfersEnabled = false;
+        finishMinting();
         Closed();
         finalize();
         wallet.transfer(this.balance);
@@ -477,9 +483,10 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale {
         //super.finalization();
     }
 
-    function currentTime() public view returns (bool){
+    function getDeposited(address _investor) public view returns (uint256){
         //return now;
-        return hasEnded();
+        //return true;
+        return deposited[_investor];
     }
 
 }

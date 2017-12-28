@@ -7,7 +7,7 @@ module.exports = (deployer) => {
     var rate = 20;
     var goal = 30000;
     var cap = 32000;
-    var wallet = 0xaa347ae50194bd91a4641658f56611edead0d993;
+    var wallet = "0xaa347ae50194bd91a4641658f56611edead0d993";
 
     deployer.deploy(SingleCrowdSale, startTime, endTime, rate, goal, cap, wallet);
 

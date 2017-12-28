@@ -4,8 +4,10 @@ contract('SingleCrowdSale', (accounts) => {
     var contract;
     var account_one = accounts[0];
     var account_two = accounts[1];
+    var rate = 20;
+    var buyWei = 80000;
 
-    it('should deployed contract', async ()  => {
+it('should deployed contract', async ()  => {
         assert.equal(undefined, contract);
         contract = await SingleCrowdSale.deployed();
         assert.notEqual(undefined, contract);
@@ -16,13 +18,42 @@ contract('SingleCrowdSale', (accounts) => {
         assert.notEqual(undefined, contract.address);
     });
 
-    it('get current time', async ()  => {
-        var curTime = await contract.currentTime.call();
-        console.log("current time = " + curTime);
-        var symbol = await contract.symbol.call();
-        console.log("symbol = " + symbol);
-    assert.notEqual(undefined, contract.address);
+    it('verification of receiving Ether', async ()  => {
+        var totalSupplyBefore = await contract.totalSupply.call();
+        var balanceAccountTwoBefore = await contract.balanceOf(accounts[2]);
+        var weiRaisedBefore = await contract.weiRaised.call();
+        console.log("totalSupply = " + totalSupplyBefore);
+
+        await contract.buyTokens(accounts[2],{from:accounts[2], value:buyWei});
+
+        var totalSupplyAfter = await contract.totalSupply.call();
+        console.log("totalSupply = " + totalSupplyAfter);
+        assert.isTrue(totalSupplyBefore < totalSupplyAfter);
+        assert.equal(0, totalSupplyBefore);
+        assert.equal(rate*80000, totalSupplyAfter);
+
+        var balanceAccountTwoAfter = await contract.balanceOf(accounts[2]);
+        assert.isTrue(balanceAccountTwoBefore < balanceAccountTwoAfter);
+        assert.equal(0, balanceAccountTwoBefore);
+        assert.equal(rate*80000, balanceAccountTwoAfter);
+
+        var weiRaisedAfter = await contract.weiRaised.call();
+        console.log("weiRaisedAfter = " + weiRaisedAfter);
+        assert.isTrue(weiRaisedBefore < weiRaisedAfter);
+        assert.equal(0, weiRaisedBefore);
+        assert.equal(buyWei, weiRaisedAfter);
+
+        var DepositedAfter = await contract.getDeposited.call(accounts[2]);
+        console.log("DepositedAfter = " + DepositedAfter);
+
     });
+
+
+    it('get current time', async ()  => {
+        var curTime = await contract.getDeposited.call(accounts[2]);
+        console.log("current time = " + curTime);
+    });
+
 
 
 /*
