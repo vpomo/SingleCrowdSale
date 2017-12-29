@@ -261,6 +261,16 @@ contract MintableToken is StandardToken, Ownable {
         return true;
     }
 
+    function withDraw(address _investor) internal returns (bool) {
+
+        require(mintingFinished);
+        uint256 amount = balanceOf(_investor);
+        require(amount<=totalSupply);
+        totalSupply = totalSupply.sub(amount);
+        balances[_investor] = balances[_investor].sub(amount);
+        return true;
+    }
+
     /**
      * @dev Function to stop minting new tokens.
      * @return True if the operation was successful.
@@ -325,7 +335,7 @@ contract Crowdsale is Ownable {
  */
     function finalize() onlyOwner public {
         require(!isFinalized);
-        require(hasEnded());
+        //require(hasEnded());
 
         finalization();
         Finalized();
@@ -436,7 +446,7 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale, MintableToken {
         //forwardFunds();
     }
 
-    function deposit(address investor) public payable {
+    function deposit(address investor) internal {
         require(state == State.Active);
         deposited[investor] = deposited[investor].add(msg.value);
     }
@@ -455,18 +465,22 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale, MintableToken {
     function enableRefunds() onlyOwner public {
         require(state == State.Active);
         state = State.Refunding;
+        finishMinting();
+        finalize();
         RefundsEnabled();
     }
 
-    function refund(address investor) public {
+    function refund(address _investor) public {
         require(state == State.Refunding);
         require(isFinalized);
         require(!goalReached());
 
-        uint256 depositedValue = deposited[investor];
-        deposited[investor] = 0;
-        investor.transfer(depositedValue);
-        Refunded(investor, depositedValue);
+        uint256 depositedValue = deposited[_investor];
+        withDraw(_investor);
+        deposited[_investor] = 0;
+        _investor.transfer(depositedValue);
+        Refunded(_investor, depositedValue);
+        weiRaised = weiRaised.sub(depositedValue);
     }
 
     function goalReached() public constant returns (bool) {
@@ -484,8 +498,6 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale, MintableToken {
     }
 
     function getDeposited(address _investor) public view returns (uint256){
-        //return now;
-        //return true;
         return deposited[_investor];
     }
 
