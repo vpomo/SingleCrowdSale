@@ -427,24 +427,16 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale, MintableToken {
 
     // low level token purchase function
     function buyTokens(address investor) public payable {
-        require(investor != address(0));
-        require(validPurchase());
-
-
         uint256 weiAmount = msg.value;
-
         // calculate token amount to be created
         uint256 tokens = weiAmount.mul(rate);
+        require(investor != address(0));
+        require(validPurchase());
         // update state
         weiRaised = weiRaised.add(weiAmount);
-
-
         mint(investor, tokens);
         TokenPurchase(investor, weiAmount, tokens);
         deposit(investor);
-
-
-        //forwardFunds();
     }
 
     function deposit(address investor) internal {
