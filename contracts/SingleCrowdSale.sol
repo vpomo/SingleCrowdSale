@@ -265,7 +265,7 @@ contract MintableToken is StandardToken, Ownable {
 
         require(mintingFinished);
         uint256 amount = balanceOf(_investor);
-        require(amount<=totalSupply);
+        require(amount <= totalSupply);
         totalSupply = totalSupply.sub(amount);
         balances[_investor] = balances[_investor].sub(amount);
         return true;
@@ -307,6 +307,7 @@ contract Crowdsale is Ownable {
     // amount of raised money in wei
     uint256 public weiRaised;
     bool public isFinalized = false;
+
     event Finalized();
 
 
@@ -372,10 +373,10 @@ contract CappedCrowdsale is Crowdsale {
         uint256 curWeiRaised = weiRaised;
         curWeiRaised.add(msg.value);
 
-        if(now >= startTime && now >= endTime){
+        if (now >= startTime && now >= endTime) {
             return false;
         }
-        if(msg.value == 0){
+        if (msg.value == 0) {
             return false;
         }
         return curWeiRaised <= cap;
@@ -467,6 +468,7 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale, MintableToken {
         state = State.Refunding;
         finishMinting();
         finalize();
+        transfersEnabled = false;
         RefundsEnabled();
     }
 
@@ -493,12 +495,18 @@ contract SingleCrowdSale is Ownable, Crowdsale, CappedCrowdsale, MintableToken {
         } else {
             enableRefunds();
         }
-
-        //super.finalization();
     }
 
     function getDeposited(address _investor) public view returns (uint256){
         return deposited[_investor];
+    }
+
+    function currentBalance() public view returns (uint256){
+        return this.balance;
+    }
+
+    function remove() public onlyOwner {
+        selfdestruct(owner);
     }
 
 }
